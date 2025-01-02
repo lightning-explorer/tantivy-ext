@@ -2,7 +2,18 @@ use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{parse_macro_input, punctuated::Punctuated, Data, DeriveInput, Fields, LitStr, Token};
 
-const TANTIVY_EXT_TYPES: [&str; 6] = ["Tokenized", "Str", "FastU64", "U64", "Date", "Score"];
+const TANTIVY_EXT_TYPES: [&str; 10] = [
+    "Tokenized",
+    "Str",
+    "FastStr",
+    "U64",
+    "FastU64",
+    "F64",
+    "FastF64",
+    "U64",
+    "Date",
+    "Score",
+];
 
 #[proc_macro_derive(Index, attributes(tantivy_ext))]
 pub fn derive_index(input: TokenStream) -> TokenStream {
@@ -21,6 +32,7 @@ pub fn derive_index(input: TokenStream) -> TokenStream {
     let ext_types_tokens = ident_vec_comma_separated(ext_types);
 
     let mut schema_lines = Vec::new();
+    let mut field_fns = Vec::new();
     let mut as_doc_lines = Vec::new();
     let mut from_doc_lines = Vec::new();
 
@@ -42,12 +54,14 @@ pub fn derive_index(input: TokenStream) -> TokenStream {
             let token_first: String = tokens.first().unwrap().value();
 
             if token_first == "primary_key" {
-                primary_key_line = Some(field_as_term(field_type, &field_name));
+                let key = quote! {&self.#field_name.tantivy_val()};
+                primary_key_line = Some(field_as_term(field_type, &field_name, key));
             }
         }
 
-        if let Some(schema_field) = schema_field_from_type(field_type, &field_name_str){
+        if let Some(schema_field) = schema_field_from_type(field_type, &field_name_str) {
             schema_lines.push(schema_field);
+            field_fns.push(create_field_fn(&field_name_str));
             as_doc_lines.push(quote! {
                 schema.get_field(#field_name_str).unwrap() => self.#field_name.tantivy_val(),
             });
@@ -69,9 +83,9 @@ pub fn derive_index(input: TokenStream) -> TokenStream {
                 schema_builder.build()
             }
 
-            fn get_primary_key(&self) -> tantivy::Result<tantivy::Term> {
+            fn get_primary_key(&self) -> tantivy::Term {
                 #primary_key_impl
-                Ok(term)
+                term
             }
 
             fn as_document(&self) -> tantivy::TantivyDocument {
@@ -96,42 +110,33 @@ pub fn derive_index(input: TokenStream) -> TokenStream {
                 SearchIndexBuilder::new(path)
             }
         }
+        impl #struct_name{
+            #(#field_fns)*
+        }
     };
 
     TokenStream::from(expanded)
 }
 
 /// Used for getting the primary key term
-fn field_as_term(ty: &syn::Type, field_name: &syn::Ident) -> proc_macro2::TokenStream {
+fn field_as_term(
+    ty: &syn::Type,
+    field_name: &syn::Ident,
+    key: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
     if let syn::Type::Path(type_path) = ty {
         if let Some(segment) = type_path.path.segments.last() {
             let type_str = &segment.ident.to_string();
             match type_str.as_str() {
-                "Tokenized" | "Str" => {
+                "Tokenized" | "Str" | "FastStr" => {
                     quote! {
                         let term = tantivy::Term::from_field_text(
-                            Self::schema().get_field(stringify!(#field_name))?,
-                            &self.#field_name.tantivy_val(),
+                            Self::schema().get_field(stringify!(#field_name)).unwrap(),
+                            #key,
                         );
                     }
                 }
-                "FastU64" | "U64" => {
-                    quote! {
-                        let term = tantivy::Term::from_field_u64(
-                            Self::schema().get_field(stringify!(#field_name))?,
-                            self.#field_name.tantivy_val(),
-                        );
-                    }
-                }
-                "Date" => {
-                    quote! {
-                        let term = tantivy::Term::from_field_date(
-                            Self::schema().get_field(stringify!(#field_name))?,
-                            self.#field_name.tantivy_val(),
-                        );
-                    }
-                }
-                _ => panic!("Unsupported primary key type: {}", type_str),
+                _ => panic!("Unsupported primary key type: {}. Primary key must be a `Tokenized`, `Str`, or `FastStr` type.", type_str),
             }
         } else {
             panic!("Invalid type path");
@@ -149,37 +154,39 @@ fn field_from_doc(ty: &syn::Type, field_name: &syn::Ident) -> proc_macro2::Token
         if let Some(segment) = type_path.path.segments.last() {
             let type_str = &segment.ident.to_string();
             match type_str.as_str() {
-                "Tokenized" | "Str" => {
+                "Tokenized" | "Str" | "FastStr" => {
                     quote! {
-                        let #field_name = util::field_extractor::field_as_string(schema, &doc,stringify!(#field_name))
-                        .expect(&format!("Could not extract {} field from document",stringify!(#field_name)));
+                        let #field_name = util::field_extractor::field_as_string(schema, &doc,stringify!(#field_name)).unwrap();
                     }
                 }
                 "FastU64" | "U64" => {
                     quote! {
-                        let #field_name = util::field_extractor::field_as_u64(schema, &doc,stringify!(#field_name))
-                        .expect(&format!("Could not extract {} field from document",stringify!(#field_name)));
+                        let #field_name = util::field_extractor::field_as_u64(schema, &doc,stringify!(#field_name)).unwrap();
+                    }
+                }
+                "FastF64" | "F64" => {
+                    quote! {
+                        let #field_name = util::field_extractor::field_as_f64(schema, &doc,stringify!(#field_name)).unwrap();
                     }
                 }
                 "Date" => {
                     quote! {
-                        let #field_name = util::field_extractor::field_as_date(schema, &doc,stringify!(#field_name))
-                        .expect(&format!("Could not extract {} field from document",stringify!(#field_name)));
+                        let #field_name = util::field_extractor::field_as_date(schema, &doc,stringify!(#field_name)).unwrap();
                     }
                 }
                 "Score" => {
-                    quote!{
+                    quote! {
                         let #field_name = score;
                     }
                 }
-                _ => panic!("Unsupported4 field type: {}", type_str),
+                _ => panic!("Unsupported field type: {}", type_str),
             }
         } else {
             panic!("Invalid type path");
         }
     } else {
         panic!(
-            "Unsupported3 field type: {:?}",
+            "Unsupported field type: {:?}",
             ty.to_token_stream().to_string()
         );
     }
@@ -192,18 +199,24 @@ fn schema_field_from_type(ty: &syn::Type, field_name: &str) -> Option<proc_macro
             // Get the last path segment. Example: `fields::FastU64` -> `FastU64`
             let type_str = &segment.ident.to_string();
             match type_str.as_str() {
-                "Tokenized" => {
-                    Some(quote! { schema_builder.add_text_field(#field_name, tantivy::schema::TEXT | tantivy::schema::STORED); })
-                }
-                "Str" => {
-                    Some(quote! { schema_builder.add_text_field(#field_name, tantivy::schema::STRING | tantivy::schema::STORED); })
-                }
-                "FastU64" => {
-                    Some(quote! { schema_builder.add_u64_field(#field_name, tantivy::schema::FAST | tantivy::schema::STORED); })
-                }
-                "Date" => {
-                    Some(quote! { schema_builder.add_date_field(#field_name, tantivy::schema::INDEXED | tantivy::schema::STORED); })
-                }
+                "Tokenized" => Some(
+                    quote! { schema_builder.add_text_field(#field_name, tantivy::schema::TEXT | tantivy::schema::STORED); },
+                ),
+                "Str" => Some(
+                    quote! { schema_builder.add_text_field(#field_name, tantivy::schema::STRING | tantivy::schema::STORED); },
+                ),
+                "FastStr" => Some(
+                    quote! { schema_builder.add_text_field(#field_name, tantivy::schema::FAST | tantivy::schema::STRING | tantivy::schema::STORED); },
+                ),
+                "U64" | "FastU64" => Some(
+                    quote! { schema_builder.add_u64_field(#field_name, tantivy::schema::FAST | tantivy::schema::STORED); },
+                ),
+                "F64" | "FastF64" => Some(
+                    quote! { schema_builder.add_f64_field(#field_name, tantivy::schema::FAST | tantivy::schema::STORED); },
+                ),
+                "Date" => Some(
+                    quote! { schema_builder.add_date_field(#field_name, tantivy::schema::INDEXED | tantivy::schema::STORED); },
+                ),
                 _ => None, // Unknown field. Don't include it in the schema
             }
         } else {
@@ -211,9 +224,24 @@ fn schema_field_from_type(ty: &syn::Type, field_name: &str) -> Option<proc_macro
         }
     } else {
         panic!(
-            "Unsupported2 field type: {:?}",
+            "Unsupported field type: {:?}",
             ty.to_token_stream().to_string()
         );
+    }
+}
+
+fn create_field_fn(field_name: &str) -> proc_macro2::TokenStream {
+    let field_fn_name = proc_macro2::Ident::new(
+        &format!("{}_field", field_name),
+        proc_macro2::Span::call_site(),
+    );
+    quote! {
+        pub fn #field_fn_name() -> index::schema::ext_field::ExtField{
+            index::schema::ext_field::ExtField::new(
+                Self::schema().get_field(#field_name).unwrap(),
+                #field_name.to_string()
+            )
+        }
     }
 }
 
@@ -235,7 +263,7 @@ fn get_tantivy_ext_types(
             }
         } else {
             panic!(
-                "Unsupported1 field type: {:?}",
+                "Unsupported field type: {:?}",
                 ty.to_token_stream().to_string()
             );
         }
@@ -246,7 +274,7 @@ fn get_tantivy_ext_types(
 fn ident_vec_comma_separated(
     vec: Vec<(&proc_macro2::Ident, &syn::Type)>,
 ) -> proc_macro2::TokenStream {
-    let tokens = vec.iter().map(|(ident, ty)| {
+    let tokens = vec.iter().map(|(ident, _ty)| {
         quote! { #ident: #ident.into() }
     });
     quote! { #(#tokens),* }

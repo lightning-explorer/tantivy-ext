@@ -7,7 +7,7 @@ use crate::index::index_builder::SearchIndexBuilder;
 pub trait Index {
     fn schema() -> Schema;
 
-    fn get_primary_key(&self) -> tantivy::Result<tantivy::Term>;
+    fn get_primary_key(&self) -> tantivy::Term;
 
     fn as_document(&self) -> TantivyDocument;
 

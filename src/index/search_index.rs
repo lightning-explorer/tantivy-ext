@@ -1,9 +1,11 @@
 use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc, time::Duration};
 
-use tantivy::{collector::TopDocs, query::Query, schema::Schema, Index, IndexReader, IndexWriter};
+use tantivy::{query::Query, schema::Schema, Index, IndexReader, IndexWriter, Searcher};
 use tokio::sync::Mutex;
 
 use crate::{entity::entity_trait, util::async_retry};
+
+use super::query::builder::QueryBuilder;
 
 pub struct SearchIndex<M>
 where
@@ -48,7 +50,7 @@ where
         }
     }
 
-    /// Adds the provided models to the search index without committing.
+    /// Adds the provided models to the search index and then commits the changes.
     pub async fn add<'a, T>(&self, models: T) -> tantivy::Result<()>
     where
         T: IntoIterator<Item = &'a M>,
@@ -57,16 +59,16 @@ where
         let writer_lock = self.writer.lock().await;
         for model in models {
             // Delete by the primary key
-            let primary_key_term = model.get_primary_key()?;
+            let primary_key_term = model.get_primary_key();
             writer_lock.delete_term(primary_key_term);
 
             writer_lock.add_document(model.as_document())?;
         }
-
+        self.commit(writer_lock).await?;
         Ok(())
     }
 
-    /// Removes the provided models from the search index without committing.
+    /// Removes the provided models from the search index and then commits the changes.
     pub async fn remove<'a, T>(&self, models: T) -> tantivy::Result<()>
     where
         T: IntoIterator<Item = &'a M>,
@@ -74,39 +76,50 @@ where
     {
         let writer_lock = self.writer.lock().await;
         for model in models {
-            let primary_key_term = model.get_primary_key()?; // Assuming `get_primary_key` is implemented for `M`
+            let primary_key_term = model.get_primary_key();
             writer_lock.delete_term(primary_key_term);
         }
+        self.commit(writer_lock).await?;
         Ok(())
     }
 
     /// Attempt to commit all pending changes.
     ///
     /// This function will retry up to 3 times in case of errors.
-    pub async fn commit(&self) -> tantivy::Result<()> {
-        let mut writer_lock = self.writer.lock().await;
+    async fn commit(
+        &self,
+        mut writer_lock: tokio::sync::MutexGuard<'_, IndexWriter>,
+    ) -> tantivy::Result<()> {
         async_retry::retry_with_backoff(|_| writer_lock.commit(), 3, Duration::from_millis(100))
             .await?;
 
         Ok(())
     }
 
-    pub fn query<Q>(&self, query: &Q, max_results: usize) -> tantivy::Result<Vec<M>>
+    pub fn query<'a, Q>(&self, query: &'a Q, max_results: usize) -> QueryBuilder<'a, Q, M>
     where
         Q: Query + Sized,
     {
         let searcher = self.reader.searcher();
-        let documents = searcher.search(query, &TopDocs::with_limit(max_results))?;
-        let models:Vec<M> = documents.into_iter().map(|(score,address)|{
-            let doc = searcher.doc(address).unwrap();
-            M::from_document(doc,score)
-        }).collect();
+        QueryBuilder::new(query, searcher, max_results)
+    }
 
-        Ok(models)
+    pub fn scored_docs_to_models(&self, docs:Vec<(f64, tantivy::DocAddress)>)->Vec<M>{
+        let mut res = Vec::new();
+        let searcher = self.reader.searcher();
+        for (score,address) in docs{
+            let doc = searcher.doc(address).unwrap();
+            res.push(M::from_document(doc, score as f32));
+        }
+        res
     }
 
     /// Get the schema that this index uses
     pub fn schema() -> Schema {
         M::schema()
+    }
+
+    pub fn searcher(&self) -> Searcher {
+        self.reader.searcher()
     }
 }

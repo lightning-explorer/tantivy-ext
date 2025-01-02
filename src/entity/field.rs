@@ -7,6 +7,7 @@ pub trait Field {
 /// ```rust
 /// TEXT | STORED
 /// ```
+#[derive(Debug)]
 pub struct Tokenized(String);
 impl Field for Tokenized {
     type Target = String;
@@ -29,6 +30,7 @@ impl From<String> for Tokenized {
 /// ```rust
 /// STRING | STORED
 /// ```
+#[derive(Debug)]
 pub struct Str(String);
 impl Field for Str {
     type Target = String;
@@ -51,6 +53,7 @@ impl From<String> for Str {
 /// ```rust
 /// STRING | FAST | STORED
 /// ```
+#[derive(Debug)]
 pub struct FastStr(String);
 impl Field for FastStr {
     type Target = String;
@@ -74,11 +77,12 @@ impl From<String> for FastStr {
 /// ```rust
 /// STORED
 /// ```
+#[derive(Debug)]
 pub struct U64(u64);
 impl Field for U64 {
     type Target = u64;
     fn tantivy_val(&self) -> Self::Target {
-        self.0.clone()
+        self.0
     }
 }
 
@@ -92,11 +96,12 @@ impl From<u64> for U64 {
 /// ```rust
 /// FAST | STORED
 /// ```
+#[derive(Debug)]
 pub struct FastU64(u64);
 impl Field for FastU64 {
     type Target = u64;
     fn tantivy_val(&self) -> Self::Target {
-        self.0.clone()
+        self.0
     }
 }
 
@@ -110,11 +115,12 @@ impl From<u64> for FastU64 {
 /// ```rust
 /// STORED
 /// ```
+#[derive(Debug)]
 pub struct F64(f64);
 impl Field for F64 {
     type Target = f64;
     fn tantivy_val(&self) -> Self::Target {
-        self.0.clone()
+        self.0
     }
 }
 
@@ -128,11 +134,12 @@ impl From<f64> for F64 {
 /// ```rust
 /// FAST | STORED
 /// ```
+#[derive(Debug)]
 pub struct FastF64(f64);
 impl Field for FastF64 {
     type Target = f64;
     fn tantivy_val(&self) -> Self::Target {
-        self.0.clone()
+        self.0
     }
 }
 
@@ -145,6 +152,7 @@ impl From<f64> for FastF64 {
 /// Represents a f32
 /// 
 /// This field as special as it is not actually stored in the search index.
+#[derive(Debug)]
 pub struct Score(f32);
 impl Field for Score {
     type Target = f32;
@@ -162,11 +170,12 @@ impl From<f32> for Score {
 /// ```rust
 /// INDEXED | STORED
 /// ```
+#[derive(Debug)]
 pub struct Date(tantivy::DateTime);
 impl Field for Date {
     type Target = tantivy::DateTime;
     fn tantivy_val(&self) -> Self::Target {
-        self.0.clone()
+        self.0
     }
 }
 

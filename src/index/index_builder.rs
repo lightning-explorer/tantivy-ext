@@ -2,7 +2,7 @@ use std::{cell::RefCell, marker::PhantomData, path::PathBuf};
 
 use crate::entity::entity_trait;
 
-use super::index::SearchIndex;
+use super::search_index::SearchIndex;
 
 pub struct SearchIndexBuilder<M>
 where

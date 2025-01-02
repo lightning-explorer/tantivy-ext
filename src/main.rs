@@ -1,42 +1,57 @@
-use std::path::PathBuf;
 use entity::{
     entity_trait::Index,
     field::{self, Field},
 };
 use index::index_builder::SearchIndexBuilder;
-use index_macro::Index;
-use tantivy::{doc, time::OffsetDateTime};
+use ext_index_macro::Index;
+use std::path::PathBuf;
+use tantivy::{
+    doc,
+    query::{BooleanQuery, Occur, QueryParser},
+    time::OffsetDateTime,
+};
 mod entity;
 mod index;
 mod util;
 
-#[derive(Index)]
+#[derive(Index, Debug)]
 struct MyModel {
     #[tantivy_ext("primary_key")]
-    id: field::FastU64,
-    name: field::Str,
+    name: field::FastStr,
     path: field::Tokenized,
     date: field::Date,
+    popularity: field::FastF64,
     score: field::Score,
 }
 
 #[tokio::main]
 async fn main() {
     let model = MyModel {
-        id: 32.into(),
         name: "file.txt".into(),
         path: "C:/directory/file.txt".into(),
         date: tantivy::DateTime::from_utc(OffsetDateTime::now_utc()).into(),
-        score: 3.2.into()
+        popularity: 10.0.into(),
+        score: 0.0.into(),
     };
-
     let save_path = PathBuf::from(r"C:\Users\grays\OneDrive\Desktop\ExtTest");
 
     let index = MyModel::index_builder(save_path)
         .with_memory_budget(50_000_000)
         .build();
 
-    if let Err(err) = index.add(vec![&model]).await {
-        println!("{}", err);
+    index.add(vec![&model]).await.expect("failed to add item");
+    // Query
+    let query_parser =
+        QueryParser::for_index(index.searcher().index(), vec![MyModel::path_field().into()]);
+    let q = query_parser.parse_query("txt").unwrap();
+    let query = BooleanQuery::new(vec![(Occur::Should, q)]);
+
+    let results = index
+        .query(&query, 50)
+        .execute()
+        .expect("Failed to execute query");
+    println!("got {} results", results.len());
+    for result in results {
+        println!("{:#?}", result);
     }
 }
