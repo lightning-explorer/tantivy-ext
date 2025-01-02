@@ -1,3 +1,8 @@
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+
+use super::util::date_converter;
+
 pub trait Field {
     type Target;
     fn tantivy_val(&self) -> Self::Target;
@@ -7,7 +12,7 @@ pub trait Field {
 /// ```rust
 /// TEXT | STORED
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tokenized(String);
 impl Field for Tokenized {
     type Target = String;
@@ -30,7 +35,7 @@ impl From<String> for Tokenized {
 /// ```rust
 /// STRING | STORED
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Str(String);
 impl Field for Str {
     type Target = String;
@@ -53,7 +58,7 @@ impl From<String> for Str {
 /// ```rust
 /// STRING | FAST | STORED
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FastStr(String);
 impl Field for FastStr {
     type Target = String;
@@ -77,7 +82,7 @@ impl From<String> for FastStr {
 /// ```rust
 /// STORED
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct U64(u64);
 impl Field for U64 {
     type Target = u64;
@@ -96,7 +101,7 @@ impl From<u64> for U64 {
 /// ```rust
 /// FAST | STORED
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FastU64(u64);
 impl Field for FastU64 {
     type Target = u64;
@@ -115,7 +120,7 @@ impl From<u64> for FastU64 {
 /// ```rust
 /// STORED
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct F64(f64);
 impl Field for F64 {
     type Target = f64;
@@ -134,7 +139,7 @@ impl From<f64> for F64 {
 /// ```rust
 /// FAST | STORED
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FastF64(f64);
 impl Field for FastF64 {
     type Target = f64;
@@ -150,9 +155,9 @@ impl From<f64> for FastF64 {
 }
 
 /// Represents a f32
-/// 
+///
 /// This field as special as it is not actually stored in the search index.
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Score(f32);
 impl Field for Score {
     type Target = f32;
@@ -170,7 +175,7 @@ impl From<f32> for Score {
 /// ```rust
 /// INDEXED | STORED
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Date(tantivy::DateTime);
 impl Field for Date {
     type Target = tantivy::DateTime;
@@ -178,9 +183,18 @@ impl Field for Date {
         self.0
     }
 }
-
+impl From<Date> for chrono::DateTime<Utc> {
+    fn from(val: Date) -> Self {
+        date_converter::tantivy_time_to_chrono_datetime(val.tantivy_val())
+    }
+}
 impl From<tantivy::DateTime> for Date {
     fn from(val: tantivy::DateTime) -> Self {
         Date(val)
+    }
+}
+impl From<chrono::DateTime<Utc>> for Date {
+    fn from(val: chrono::DateTime<Utc>) -> Self {
+        Date(date_converter::chrono_time_to_tantivy_datetime(val))
     }
 }

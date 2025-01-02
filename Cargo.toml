@@ -1,11 +1,13 @@
 [package]
-name = "tantivy-ext"
+name = "tantivy_ext"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 tantivy = "0.22.0"
 tokio = { version = "1.41.1", features = ["full"] }
+serde = { version = "1.0.213", features = ["derive"] }
+chrono = { version = "0.4" }
 ext-index-macro = { path= "./ext-index-macro" }
 rand = "0.8.5"
 rand_chacha = "0.3"

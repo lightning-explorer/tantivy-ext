@@ -1,6 +1,6 @@
 use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc, time::Duration};
 
-use tantivy::{query::Query, schema::Schema, Index, IndexReader, IndexWriter, Searcher};
+use tantivy::{query::Query, schema::Schema, Index, IndexReader, IndexWriter, Searcher, Term};
 use tokio::sync::Mutex;
 
 use crate::{entity::entity_trait, util::async_retry};
@@ -81,6 +81,22 @@ where
         }
         self.commit(writer_lock).await?;
         Ok(())
+    }
+
+    /// Removes all models from the search index with the provided term 
+    /// 
+    /// Example:
+    /// ```rust
+    /// let term = MyModel::name_field().term(String::from("Joe"));
+    /// index.remove_by_terms(vec![term]).await;
+    /// ```
+    pub async fn remove_by_terms(&self,terms:Vec<Term>) -> tantivy::Result<()>{
+        let writer_lock = self.writer.lock().await;
+        for term in terms{
+            writer_lock.delete_term(term);
+
+        }
+        self.commit(writer_lock).await
     }
 
     /// Attempt to commit all pending changes.

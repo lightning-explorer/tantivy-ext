@@ -15,7 +15,7 @@ const TANTIVY_EXT_TYPES: [&str; 10] = [
     "Score",
 ];
 
-#[proc_macro_derive(Index, attributes(tantivy_ext))]
+#[proc_macro_derive(SearchIndex, attributes(tantivy_ext))]
 pub fn derive_index(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -61,7 +61,7 @@ pub fn derive_index(input: TokenStream) -> TokenStream {
 
         if let Some(schema_field) = schema_field_from_type(field_type, &field_name_str) {
             schema_lines.push(schema_field);
-            field_fns.push(create_field_fn(&field_name_str));
+            field_fns.push(create_field_fn(&field_name_str, field_type));
             as_doc_lines.push(quote! {
                 schema.get_field(#field_name_str).unwrap() => self.#field_name.tantivy_val(),
             });
@@ -76,7 +76,11 @@ pub fn derive_index(input: TokenStream) -> TokenStream {
     });
 
     let expanded = quote! {
-        impl Index for #struct_name {
+        use tantivy_ext::ext_type_trait::ExtType;
+        use tantivy_ext::Field;
+        use tantivy_ext::Index;
+
+        impl ::tantivy_ext::Index for #struct_name {
             fn schema() -> tantivy::schema::Schema {
                 let mut schema_builder = tantivy::schema::Schema::builder();
                 #(#schema_lines)*
@@ -103,11 +107,11 @@ pub fn derive_index(input: TokenStream) -> TokenStream {
                 }
             }
 
-            fn index_builder(path: PathBuf) -> SearchIndexBuilder<Self>
+            fn index_builder(path: PathBuf) -> ::tantivy_ext::index::index_builder::SearchIndexBuilder<Self>
             where
                 Self: std::marker::Sized,
             {
-                SearchIndexBuilder::new(path)
+                ::tantivy_ext::index::index_builder::SearchIndexBuilder::new(path)
             }
         }
         impl #struct_name{
@@ -156,22 +160,22 @@ fn field_from_doc(ty: &syn::Type, field_name: &syn::Ident) -> proc_macro2::Token
             match type_str.as_str() {
                 "Tokenized" | "Str" | "FastStr" => {
                     quote! {
-                        let #field_name = util::field_extractor::field_as_string(schema, &doc,stringify!(#field_name)).unwrap();
+                        let #field_name = ::tantivy_ext::field_extractor::field_as_string(schema, &doc,stringify!(#field_name)).unwrap();
                     }
                 }
                 "FastU64" | "U64" => {
                     quote! {
-                        let #field_name = util::field_extractor::field_as_u64(schema, &doc,stringify!(#field_name)).unwrap();
+                        let #field_name = ::tantivy_ext::field_extractor::field_as_u64(schema, &doc,stringify!(#field_name)).unwrap();
                     }
                 }
                 "FastF64" | "F64" => {
                     quote! {
-                        let #field_name = util::field_extractor::field_as_f64(schema, &doc,stringify!(#field_name)).unwrap();
+                        let #field_name = ::tantivy_ext::field_extractor::field_as_f64(schema, &doc,stringify!(#field_name)).unwrap();
                     }
                 }
                 "Date" => {
                     quote! {
-                        let #field_name = util::field_extractor::field_as_date(schema, &doc,stringify!(#field_name)).unwrap();
+                        let #field_name = ::tantivy_ext::field_extractor::field_as_date(schema, &doc,stringify!(#field_name)).unwrap();
                     }
                 }
                 "Score" => {
@@ -230,16 +234,41 @@ fn schema_field_from_type(ty: &syn::Type, field_name: &str) -> Option<proc_macro
     }
 }
 
-fn create_field_fn(field_name: &str) -> proc_macro2::TokenStream {
+fn syn_type_to_ext_type(ty: &syn::Type) -> proc_macro2::TokenStream {
+    if let syn::Type::Path(type_path) = ty {
+        if let Some(segment) = type_path.path.segments.last() {
+            // Get the last path segment. Example: `fields::FastU64` -> `FastU64`
+            let type_str = &segment.ident.to_string();
+            match type_str.as_str() {
+                "FastStr" | "Str" | "Tokenized" => quote! {::tantivy_ext::ext_type::ExtText},
+                "U64" | "FastU64" => quote! {::tantivy_ext::ext_type::ExtU64},
+                "F64" | "FastF64" => quote! {::tantivy_ext::ext_type::ExtF64},
+                "Date" => quote! {::tantivy_ext::ext_type::ExtDate},
+                _ => panic!("Unknown EXT field: {}", type_str),
+            }
+        } else {
+            panic!("Invalid type path");
+        }
+    } else {
+        panic!(
+            "Unsupported field type: {:?}",
+            ty.to_token_stream().to_string()
+        );
+    }
+}
+
+fn create_field_fn(field_name: &str, field_type: &syn::Type) -> proc_macro2::TokenStream {
     let field_fn_name = proc_macro2::Ident::new(
         &format!("{}_field", field_name),
         proc_macro2::Span::call_site(),
     );
+    // This will be used as the generic
+    let ext_type = syn_type_to_ext_type(field_type);
     quote! {
-        pub fn #field_fn_name() -> index::schema::ext_field::ExtField{
-            index::schema::ext_field::ExtField::new(
-                Self::schema().get_field(#field_name).unwrap(),
-                #field_name.to_string()
+        pub fn #field_fn_name() -> ::tantivy_ext::ext_field::ExtField::<#ext_type>{
+            ::tantivy_ext::ext_field::ExtField::new(
+                #field_name.to_string(),
+                Self::schema()
             )
         }
     }
