@@ -2,6 +2,9 @@
 name = "ext-index-macro"
 version = "0.1.0"
 edition = "2021"
+authors = ["Grayson Rieger graysonr12@icloud.com"]
+license = "MIT"
+description = "macro for tantivy_ext crate"
 
 [lib]
 proc-macro = true

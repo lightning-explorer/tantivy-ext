@@ -1,7 +1,11 @@
 [package]
 name = "tantivy_ext"
 version = "0.1.0"
+authors = ["Grayson Rieger graysonr12@icloud.com"]
 edition = "2021"
+license = "MIT" 
+description = "Tantivy but more type safe"
+repository = "https://github.com/lightning-explorer/tantivy-ext"
 
 [dependencies]
 tantivy = "0.22.0"

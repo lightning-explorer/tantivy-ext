@@ -15,7 +15,7 @@ const TANTIVY_EXT_TYPES: [&str; 10] = [
     "Score",
 ];
 
-#[proc_macro_derive(SearchIndex, attributes(tantivy_ext))]
+#[proc_macro_derive(TantivySearchIndex, attributes(tantivy_ext))]
 pub fn derive_index(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -79,6 +79,7 @@ pub fn derive_index(input: TokenStream) -> TokenStream {
         use tantivy_ext::ext_type_trait::ExtType;
         use tantivy_ext::Field;
         use tantivy_ext::Index;
+        use tantivy::doc;
 
         impl ::tantivy_ext::Index for #struct_name {
             fn schema() -> tantivy::schema::Schema {
@@ -107,7 +108,7 @@ pub fn derive_index(input: TokenStream) -> TokenStream {
                 }
             }
 
-            fn index_builder(path: PathBuf) -> ::tantivy_ext::index::index_builder::SearchIndexBuilder<Self>
+            fn index_builder(path: std::path::PathBuf) -> ::tantivy_ext::index::index_builder::SearchIndexBuilder<Self>
             where
                 Self: std::marker::Sized,
             {

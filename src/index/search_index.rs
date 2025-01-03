@@ -5,14 +5,19 @@ use tokio::sync::Mutex;
 
 use crate::{entity::entity_trait, util::async_retry};
 
-use super::query::builder::QueryBuilder;
+use super::{backend::TantivyBackend, query::builder::QueryBuilder};
 
+/// A tantivy search index over instances of the provided struct.
+///
+/// Because all of the underlying data wraps an `Arc`, this can be negligibly cloned
+#[derive(Clone)]
 pub struct SearchIndex<M>
 where
     M: entity_trait::Index,
 {
     writer: Arc<Mutex<IndexWriter>>,
     reader: IndexReader,
+    index: tantivy::Index,
 
     phantom: PhantomData<M>,
 }
@@ -46,6 +51,7 @@ where
         Self {
             writer: Arc::new(Mutex::new(writer)),
             reader,
+            index,
             phantom: PhantomData,
         }
     }
@@ -83,18 +89,17 @@ where
         Ok(())
     }
 
-    /// Removes all models from the search index with the provided term 
-    /// 
+    /// Removes all models from the search index with the provided term
+    ///
     /// Example:
     /// ```rust
     /// let term = MyModel::name_field().term(String::from("Joe"));
     /// index.remove_by_terms(vec![term]).await;
     /// ```
-    pub async fn remove_by_terms(&self,terms:Vec<Term>) -> tantivy::Result<()>{
+    pub async fn remove_by_terms(&self, terms: Vec<Term>) -> tantivy::Result<()> {
         let writer_lock = self.writer.lock().await;
-        for term in terms{
+        for term in terms {
             writer_lock.delete_term(term);
-
         }
         self.commit(writer_lock).await
     }
@@ -120,14 +125,13 @@ where
         QueryBuilder::new(query, searcher, max_results)
     }
 
-    pub fn scored_docs_to_models(&self, docs:Vec<(f64, tantivy::DocAddress)>)->Vec<M>{
-        let mut res = Vec::new();
+    pub fn scored_doc_to_model(&self, doc: (f64, tantivy::DocAddress)) -> tantivy::Result<M> {
         let searcher = self.reader.searcher();
-        for (score,address) in docs{
-            let doc = searcher.doc(address).unwrap();
-            res.push(M::from_document(doc, score as f32));
-        }
-        res
+        let (score, address) = doc;
+
+        let doc = searcher.doc(address)?;
+
+        Ok(M::from_document(doc, score as f32))
     }
 
     /// Get the schema that this index uses
@@ -135,7 +139,12 @@ where
         M::schema()
     }
 
-    pub fn searcher(&self) -> Searcher {
-        self.reader.searcher()
+    pub fn get_tantivy_backend(&self) -> TantivyBackend {
+        TantivyBackend {
+            writer: &self.writer,
+            reader: &self.reader,
+            index: &self.index,
+            schema: M::schema(),
+        }
     }
 }

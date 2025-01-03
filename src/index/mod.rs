@@ -7,4 +7,5 @@ pub mod ext{
     pub mod ext_type_trait;
     pub mod ext_type;
 }
-mod search_index;
+mod backend;
+pub mod search_index;

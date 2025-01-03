@@ -1,13 +1,19 @@
+// use std::path::PathBuf;
 
+// use tantivy::{
+//     query::{BooleanQuery, Occur, QueryParser},
+//     time::OffsetDateTime,
+// };
+// use tantivy_ext::TantivySearchIndex;
 
-// #[derive(Index, Debug)]
+// #[derive(TantivySearchIndex, Debug)]
 // struct MyModel {
 //     #[tantivy_ext("primary_key")]
-//     name: field::FastStr,
-//     path: field::Tokenized,
-//     date: field::Date,
-//     popularity: field::FastF64,
-//     score: field::Score,
+//     name: tantivy_ext::FastStr,
+//     path: tantivy_ext::Tokenized,
+//     date: tantivy_ext::Date,
+//     popularity: tantivy_ext::FastF64,
+//     score: tantivy_ext::Score,
 // }
 
 // #[tokio::main]
