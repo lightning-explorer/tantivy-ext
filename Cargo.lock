@@ -257,6 +257,8 @@ dependencies = [
 [[package]]
 name = "ext-index-macro"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c23c689fa4b4b83853cae96d2f1b751df7a5b1e7e1470f24605f61622fad8f5"
 dependencies = [
  "proc-macro2",
  "quote",
