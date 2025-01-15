@@ -1,6 +1,6 @@
 use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc, time::Duration};
 
-use tantivy::{query::Query, schema::Schema, Index, IndexReader, IndexWriter, Searcher, Term};
+use tantivy::{query::{Query, QueryParser}, schema::{Field, Schema}, Index, IndexReader, IndexWriter, Searcher, Term};
 use tokio::sync::Mutex;
 
 use crate::{entity::entity_trait, util::async_retry};
@@ -115,6 +115,11 @@ where
             .await?;
 
         Ok(())
+    }
+
+    /// Get the query parser for this search index
+    pub fn query_parser(&self, default_fields:Vec<Field>)->QueryParser{
+        QueryParser::for_index(&self.index, default_fields)
     }
 
     pub fn query<'a, Q>(&self, query: &'a Q, max_results: usize) -> QueryBuilder<'a, Q, M>

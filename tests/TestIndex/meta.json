@@ -1,0 +1,82 @@
+{
+  "index_settings": {
+    "docstore_compression": "lz4",
+    "docstore_blocksize": 16384
+  },
+  "segments": [
+    {
+      "segment_id": "924997d7-322d-4b25-9259-7faa404f34d4",
+      "max_doc": 35751,
+      "deletes": {
+        "num_deleted_docs": 12793,
+        "opstamp": 200003
+      }
+    },
+    {
+      "segment_id": "a68870df-2134-4da1-bb00-a6573d21b3a7",
+      "max_doc": 34208,
+      "deletes": {
+        "num_deleted_docs": 12895,
+        "opstamp": 200003
+      }
+    },
+    {
+      "segment_id": "907e5e92-8dbb-408e-9fe6-a37782367433",
+      "max_doc": 30041,
+      "deletes": {
+        "num_deleted_docs": 11024,
+        "opstamp": 200003
+      }
+    }
+  ],
+  "schema": [
+    {
+      "name": "name",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "basic",
+          "fieldnorms": true,
+          "tokenizer": "raw"
+        },
+        "stored": true,
+        "fast": true
+      }
+    },
+    {
+      "name": "path",
+      "type": "text",
+      "options": {
+        "indexing": {
+          "record": "position",
+          "fieldnorms": true,
+          "tokenizer": "default"
+        },
+        "stored": true,
+        "fast": false
+      }
+    },
+    {
+      "name": "date",
+      "type": "date",
+      "options": {
+        "indexed": true,
+        "fieldnorms": true,
+        "fast": false,
+        "stored": true,
+        "precision": "seconds"
+      }
+    },
+    {
+      "name": "popularity",
+      "type": "f64",
+      "options": {
+        "indexed": false,
+        "fieldnorms": false,
+        "fast": true,
+        "stored": true
+      }
+    }
+  ],
+  "opstamp": 200003
+}

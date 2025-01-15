@@ -7,3 +7,4 @@ edition = "2021"
 tokio = { version = "1.41.1", features = ["full"] }
 tantivy = "0.22.0"
 tantivy_ext = {path = "../"}
+rand = "0.8"
