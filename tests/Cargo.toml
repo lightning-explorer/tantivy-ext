@@ -1,10 +1,10 @@
 [package]
 name = "tests"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 [dependencies]
 tokio = { version = "1.41.1", features = ["full"] }
 tantivy = "0.22.0"
-tantivy_ext = {path = "../"}
+tantivy_ext = { path = "../" }
 rand = "0.8"

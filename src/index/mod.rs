@@ -8,4 +8,5 @@ pub mod ext{
     pub mod ext_type;
 }
 mod backend;
+mod writer_recycler;
 pub mod search_index;

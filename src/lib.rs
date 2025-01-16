@@ -1,6 +1,7 @@
 mod entity;
 pub mod index;
 pub mod util;
+pub mod re_exports;
 
 pub use entity::entity_trait::Index;
 pub use entity::field::*;

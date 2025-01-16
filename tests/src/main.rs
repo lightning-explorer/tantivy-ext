@@ -10,7 +10,7 @@ struct MyModel {
     path: tantivy_ext::Tokenized,
     date: tantivy_ext::Date,
     popularity: tantivy_ext::FastF64,
-    score: tantivy_ext::Score,
+    not_score: tantivy_ext::Score,
 }
 
 #[tokio::main]
@@ -25,7 +25,7 @@ async fn main() {
             path: "tokenized".into(),
             date: tantivy::DateTime::from_utc(OffsetDateTime::now_utc()).into(),
             popularity: 10.0.into(),
-            score: 0.0.into(),
+            not_score: 0.0.into(),
         };
         models.push(model);
     }

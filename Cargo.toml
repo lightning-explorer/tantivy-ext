@@ -3,7 +3,7 @@ name = "tantivy_ext"
 version = "0.1.0"
 authors = ["Grayson Rieger graysonr12@icloud.com"]
 edition = "2021"
-license = "MIT" 
+license = "MIT"
 description = "Tantivy but more type safe"
 repository = "https://github.com/lightning-explorer/tantivy-ext"
 
@@ -12,6 +12,7 @@ tantivy = "0.22.0"
 tokio = { version = "1.41.1", features = ["full"] }
 serde = { version = "1.0.213", features = ["derive"] }
 chrono = { version = "0.4" }
-ext-index-macro = { version = "0.1" }
+ext-index-macro = {path = "./ext-index-macro"}
 rand = "0.8.5"
 rand_chacha = "0.3"
+once_cell = "1.20.2"

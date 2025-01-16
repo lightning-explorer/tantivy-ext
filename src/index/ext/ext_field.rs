@@ -1,4 +1,4 @@
-use tantivy::schema::{Field, Schema};
+use tantivy::schema::Field;
 
 use super::ext_type_trait::ExtType;
 
@@ -16,12 +16,12 @@ impl<T> ExtField<T>
 where
     T: ExtType,
 {
-    pub fn new(field_name: String, schema: Schema) -> Self {
+    pub fn new(field_name: String, field: Field) -> Self {
         Self {
-            ext_type: T::new_from_schema(schema, field_name),
+            ext_type: T::new_from_field(field, field_name),
         }
     }
-    pub fn term(&self, input:T::Target)->tantivy::Term{
+    pub fn term(&self, input: T::Target) -> tantivy::Term {
         self.ext_type.term(input)
     }
 }
@@ -31,11 +31,9 @@ where
     T: ExtType,
 {
     fn from(value: ExtField<T>) -> Self {
-        value
+        *value
             .ext_type
-            .schema()
-            .get_field(&value.ext_type.name())
-            .unwrap()
+            .field()
     }
 }
 

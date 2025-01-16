@@ -4,5 +4,5 @@ use tantivy::{schema::Schema, IndexReader};
 pub struct TantivyBackend<'a>{
     pub reader: &'a IndexReader,
     pub index: &'a tantivy::Index,
-    pub schema: Schema
+    pub schema: &'static Schema
 }

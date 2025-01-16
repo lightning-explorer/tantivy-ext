@@ -5,7 +5,7 @@ use tantivy::{schema::Schema, TantivyDocument};
 use crate::index::index_builder::SearchIndexBuilder;
 
 pub trait Index {
-    fn schema() -> Schema;
+    fn schema() -> &'static Schema;
 
     fn get_primary_key(&self) -> tantivy::Term;
 
