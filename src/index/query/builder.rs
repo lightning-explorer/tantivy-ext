@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use tantivy::{collector::TopDocs, query::Query, Searcher, SegmentReader};
+use tantivy::{collector::TopDocs, query::Query, Searcher};
 
 use crate::entity::entity_trait;
 

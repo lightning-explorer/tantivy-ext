@@ -1,7 +1,10 @@
-use std::{fs, marker::PhantomData, path::PathBuf, sync::Arc, time::Duration};
+use std::{fs, marker::PhantomData, path::PathBuf, time::Duration};
 
-use tantivy::{query::{Query, QueryParser}, schema::{Field, Schema}, Index, IndexReader, IndexWriter, Searcher, Term};
-use tokio::sync::Mutex;
+use tantivy::{
+    query::{Query, QueryParser},
+    schema::{Field, Schema},
+    Index, IndexReader, IndexWriter, Term,
+};
 
 use crate::{entity::entity_trait, util::async_retry};
 
@@ -15,7 +18,8 @@ pub struct SearchIndex<M>
 where
     M: entity_trait::Index,
 {
-    writer: Arc<Mutex<IndexWriter>>,
+    buffer_size: usize,
+
     reader: IndexReader,
     index: tantivy::Index,
 
@@ -40,7 +44,6 @@ where
             Index::create_in_dir(index_path, schema.clone())
         };
         let index = index.unwrap();
-        let writer: IndexWriter = index.writer(buffer_size).unwrap();
 
         let reader = index
             .reader_builder()
@@ -49,7 +52,7 @@ where
             .unwrap();
 
         Self {
-            writer: Arc::new(Mutex::new(writer)),
+            buffer_size,
             reader,
             index,
             phantom: PhantomData,
@@ -62,15 +65,16 @@ where
         T: IntoIterator<Item = &'a M>,
         M: 'a,
     {
-        let writer_lock = self.writer.lock().await;
+        let mut writer = self.create_writer();
         for model in models {
             // Delete by the primary key
             let primary_key_term = model.get_primary_key();
-            writer_lock.delete_term(primary_key_term);
+            writer.delete_term(primary_key_term);
 
-            writer_lock.add_document(model.as_document())?;
+            writer.add_document(model.as_document())?;
         }
-        self.commit(writer_lock).await?;
+        self.commit(&mut writer).await?;
+        writer.wait_merging_threads()?;
         Ok(())
     }
 
@@ -80,12 +84,12 @@ where
         T: IntoIterator<Item = &'a M>,
         M: 'a,
     {
-        let writer_lock = self.writer.lock().await;
+        let mut writer = self.create_writer();
         for model in models {
             let primary_key_term = model.get_primary_key();
-            writer_lock.delete_term(primary_key_term);
+            writer.delete_term(primary_key_term);
         }
-        self.commit(writer_lock).await?;
+        self.commit(&mut writer).await?;
         Ok(())
     }
 
@@ -97,28 +101,24 @@ where
     /// index.remove_by_terms(vec![term]).await;
     /// ```
     pub async fn remove_by_terms(&self, terms: Vec<Term>) -> tantivy::Result<()> {
-        let writer_lock = self.writer.lock().await;
+        let mut writer = self.create_writer();
         for term in terms {
-            writer_lock.delete_term(term);
+            writer.delete_term(term);
         }
-        self.commit(writer_lock).await
+        self.commit(&mut writer).await
     }
 
     /// Attempt to commit all pending changes.
     ///
     /// This function will retry up to 3 times in case of errors.
-    async fn commit(
-        &self,
-        mut writer_lock: tokio::sync::MutexGuard<'_, IndexWriter>,
-    ) -> tantivy::Result<()> {
-        async_retry::retry_with_backoff(|_| writer_lock.commit(), 3, Duration::from_millis(100))
-            .await?;
+    async fn commit(&self, writer: &mut IndexWriter) -> tantivy::Result<()> {
+        async_retry::retry_with_backoff(|_| writer.commit(), 3, Duration::from_millis(100)).await?;
 
         Ok(())
     }
 
     /// Get the query parser for this search index
-    pub fn query_parser(&self, default_fields:Vec<Field>)->QueryParser{
+    pub fn query_parser(&self, default_fields: Vec<Field>) -> QueryParser {
         QueryParser::for_index(&self.index, default_fields)
     }
 
@@ -139,6 +139,10 @@ where
         Ok(M::from_document(doc, score as f32))
     }
 
+    pub fn create_writer(&self) -> IndexWriter {
+        self.index.writer(self.buffer_size).unwrap()
+    }
+
     /// Get the schema that this index uses
     pub fn schema() -> Schema {
         M::schema()
@@ -146,7 +150,6 @@ where
 
     pub fn get_tantivy_backend(&self) -> TantivyBackend {
         TantivyBackend {
-            writer: &self.writer,
             reader: &self.reader,
             index: &self.index,
             schema: M::schema(),
