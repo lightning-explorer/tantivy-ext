@@ -10,6 +10,7 @@ where
 {
     save_path: PathBuf,
     memory_budget_in_bytes: RefCell<usize>,
+    recycle_after: RefCell<usize>,
 
     phantom: PhantomData<M>,
 }
@@ -22,6 +23,7 @@ where
         Self {
             save_path,
             memory_budget_in_bytes: RefCell::new(50_000_000),
+            recycle_after: RefCell::new(1_000_000),
             phantom: PhantomData,
         }
     }
@@ -31,7 +33,16 @@ where
         self
     }
 
+    pub fn with_recycle_after(self, recycle_after: usize) -> Self {
+        *self.recycle_after.borrow_mut() = recycle_after;
+        self
+    }
+
     pub fn build(self) -> SearchIndex<M> {
-        SearchIndex::new(*self.memory_budget_in_bytes.borrow(), self.save_path)
+        SearchIndex::new(
+            self.save_path,
+            *self.memory_budget_in_bytes.borrow(),
+            *self.recycle_after.borrow(),
+        )
     }
 }
