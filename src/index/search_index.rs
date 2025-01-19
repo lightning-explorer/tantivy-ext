@@ -161,6 +161,10 @@ where
         Ok(M::from_document(doc, score as f32))
     }
 
+    pub async fn recycle_writer(&self) -> tantivy::Result<()>{
+        self.writer_recycler.replace_writer().await
+    }
+
     pub fn get_writer(&self) -> Arc<RwLock<Option<IndexWriter>>> {
         self.writer_recycler.get_writer()
     }
