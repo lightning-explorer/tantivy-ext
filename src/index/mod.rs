@@ -10,3 +10,4 @@ pub mod ext{
 mod backend;
 mod writer_recycler;
 pub mod search_index;
+pub mod recycling_index;

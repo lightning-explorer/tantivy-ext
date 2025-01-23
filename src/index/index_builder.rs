@@ -2,7 +2,7 @@ use std::{cell::RefCell, marker::PhantomData, path::PathBuf};
 
 use crate::entity::entity_trait;
 
-use super::search_index::SearchIndex;
+use super::{recycling_index::RecyclingSearchIndex, search_index::SearchIndex};
 
 pub struct SearchIndexBuilder<M>
 where
@@ -39,8 +39,18 @@ where
         self
     }
 
+    /// Builds a `SearchIndex` that recycles the `IndexWriter`
     pub fn build(self) -> SearchIndex<M> {
         SearchIndex::new(
+            self.save_path,
+            *self.memory_budget_in_bytes.borrow(),
+            *self.recycle_after.borrow(),
+        )
+    }
+
+    /// Builds a `RecyclingSearchIndex` that recycles the `Index` itself
+    pub fn build_recycling(self) -> RecyclingSearchIndex<M> {
+        RecyclingSearchIndex::new(
             self.save_path,
             *self.memory_budget_in_bytes.borrow(),
             *self.recycle_after.borrow(),

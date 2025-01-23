@@ -22,13 +22,13 @@ async fn main() {
 
         let index = MyModel::index_builder(save_path)
             .with_memory_budget(50_000_000)
-            .with_recycle_after(100_000)
+            .with_recycle_after(10_000)
             .build();
 
         for i in 0..1_000 {
             let mut models = Vec::new();
 
-            for _ in 0..1_00 {
+            for _ in 0..10_00 {
                 let random_int: i32 = rng.gen_range(1..=100_000);
                 let model = MyModel {
                     name: random_int.to_string().into(),
@@ -45,8 +45,8 @@ async fn main() {
         index
             .recycle_writer()
             .await
-            .expect("Failed to recycle writer");
-        println!("alll done");
+            .expect("Failed to recycle index");
+        println!("all done");
     }
     loop {
         tokio::time::sleep(Duration::from_secs(4)).await;

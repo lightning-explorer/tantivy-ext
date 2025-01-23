@@ -10,7 +10,8 @@ use tokio::sync::RwLock;
 use crate::{entity::entity_trait, util::async_retry};
 
 use super::{
-    backend::TantivyBackend, query::builder::QueryBuilder, writer_recycler::IndexWriterRecycler,
+    backend::RecyclingTantivyBackend, query::builder::QueryBuilder,
+    writer_recycler::IndexWriterRecycler,
 };
 
 /// A tantivy search index over instances of the provided struct.
@@ -32,7 +33,7 @@ impl<M> SearchIndex<M>
 where
     M: entity_trait::Index,
 {
-    pub fn new(index_path: PathBuf, buffer_size:usize, entries_before_recycle:usize) -> Self {
+    pub fn new(index_path: PathBuf, buffer_size: usize, entries_before_recycle: usize) -> Self {
         let schema = M::schema();
         // Create the Tantivy index
         let index = if index_path.exists() {
@@ -161,7 +162,7 @@ where
         Ok(M::from_document(doc, score as f32))
     }
 
-    pub async fn recycle_writer(&self) -> tantivy::Result<()>{
+    pub async fn recycle_writer(&self) -> tantivy::Result<()> {
         self.writer_recycler.replace_writer().await
     }
 
@@ -174,8 +175,8 @@ where
         M::schema()
     }
 
-    pub fn get_tantivy_backend(&self) -> TantivyBackend {
-        TantivyBackend {
+    pub fn get_tantivy_backend(&self) -> RecyclingTantivyBackend {
+        RecyclingTantivyBackend {
             reader: &self.reader,
             writer: &self.writer_recycler,
             index: &self.index,
