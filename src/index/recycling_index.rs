@@ -37,9 +37,9 @@ where
     phantom: PhantomData<M>,
 }
 pub struct TantivyBackend {
-    writer: IndexWriter,
-    reader: IndexReader,
-    index: tantivy::Index,
+    pub writer: IndexWriter,
+    pub reader: IndexReader,
+    pub index: tantivy::Index,
 }
 
 impl<M> RecyclingSearchIndex<M>
@@ -228,7 +228,7 @@ where
     }
 
     /// Can safely be unwrapped under normal circumstances
-    pub async fn get_tantivy_backend(&self) -> Arc<RwLock<Option<TantivyBackend>>> {
+    pub fn get_tantivy_backend(&self) -> Arc<RwLock<Option<TantivyBackend>>> {
         self.inner.clone()
     }
 }
