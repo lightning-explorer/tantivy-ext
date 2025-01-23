@@ -32,7 +32,7 @@ impl<M> SearchIndex<M>
 where
     M: entity_trait::Index,
 {
-    pub fn new(index_path: PathBuf, buffer_size: usize, entries_before_recycle:usize) -> Self {
+    pub fn new(index_path: PathBuf, buffer_size:usize, entries_before_recycle:usize) -> Self {
         let schema = M::schema();
         // Create the Tantivy index
         let index = if index_path.exists() {
@@ -70,7 +70,7 @@ where
         let models_len = models.len();
         {
             let mut writer_lock = writer.write().await;
-            let mut writer_lock = writer_lock.as_mut().unwrap();
+            let writer_lock = writer_lock.as_mut().unwrap();
             for model in models {
                 // Delete by the primary key
                 let primary_key_term = model.get_primary_key();
@@ -78,7 +78,7 @@ where
 
                 writer_lock.add_document(model.as_document())?;
             }
-            self.commit(&mut writer_lock).await?;
+            self.commit(writer_lock).await?;
         }
         // Writer lock must be dropped so this function can use it
         self.writer_recycler
@@ -93,12 +93,12 @@ where
         let writer = self.get_writer();
         {
             let mut writer_lock = writer.write().await;
-            let mut writer_lock = writer_lock.as_mut().unwrap();
+            let writer_lock = writer_lock.as_mut().unwrap();
             for model in models {
                 let primary_key_term = model.get_primary_key();
                 writer_lock.delete_term(primary_key_term);
             }
-            self.commit(&mut writer_lock).await?;
+            self.commit(writer_lock).await?;
         }
         // Writer lock must be dropped so this function can use it
         self.writer_recycler
@@ -119,11 +119,11 @@ where
         let terms_len = terms.len();
         {
             let mut writer_lock = writer.write().await;
-            let mut writer_lock = writer_lock.as_mut().unwrap();
+            let writer_lock = writer_lock.as_mut().unwrap();
             for term in terms {
                 writer_lock.delete_term(term);
             }
-            self.commit(&mut writer_lock).await?;
+            self.commit(writer_lock).await?;
         }
         self.writer_recycler
             .register_entries_processed(terms_len)
@@ -161,12 +161,12 @@ where
         Ok(M::from_document(doc, score as f32))
     }
 
-    pub fn get_writer(&self) -> Arc<RwLock<Option<IndexWriter>>> {
-        self.writer_recycler.get_writer()
+    pub async fn recycle_writer(&self) -> tantivy::Result<()>{
+        self.writer_recycler.replace_writer().await
     }
 
-    pub async fn recycle_writer(&self)->tantivy::Result<()>{
-        self.writer_recycler.replace_writer().await
+    pub fn get_writer(&self) -> Arc<RwLock<Option<IndexWriter>>> {
+        self.writer_recycler.get_writer()
     }
 
     /// Get the schema that this index uses

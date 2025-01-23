@@ -39,6 +39,11 @@ where
         self
     }
 
+    pub fn with_recycle_after(self, recycle_after: usize) -> Self {
+        *self.recycle_after.borrow_mut() = recycle_after;
+        self
+    }
+
     pub fn build(self) -> SearchIndex<M> {
         SearchIndex::new(
             self.save_path,
