@@ -32,7 +32,7 @@ where
         *self.memory_budget_in_bytes.borrow_mut() = memory_budget_in_bytes;
         self
     }
-    
+
     /// After how many entries being processed should the `IndexWriter` get recycled
     pub fn with_recycle_after(self, recycle_after: usize) -> Self {
         *self.recycle_after.borrow_mut() = recycle_after;
