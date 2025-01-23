@@ -4,7 +4,7 @@ use crate::entity::entity_trait;
 
 use super::query::builder::QueryBuilder;
 
-pub trait SearchIndexTrait<M>
+pub trait SearchIndexTrait<M>: Send + Sync + 'static
 where
     M: entity_trait::Index,
 {

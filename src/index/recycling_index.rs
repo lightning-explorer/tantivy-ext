@@ -37,9 +37,9 @@ where
     phantom: PhantomData<M>,
 }
 pub struct TantivyBackend {
-    writer: IndexWriter,
-    reader: IndexReader,
-    index: tantivy::Index,
+    pub writer: IndexWriter,
+    pub reader: IndexReader,
+    pub index: tantivy::Index,
 }
 
 impl<M> RecyclingSearchIndex<M>
@@ -131,12 +131,15 @@ where
     }
 
     /// Can safely be unwrapped under normal circumstances
-    pub async fn get_tantivy_backend(&self) -> Arc<RwLock<Option<TantivyBackend>>> {
+    pub fn get_tantivy_backend(&self) -> Arc<RwLock<Option<TantivyBackend>>> {
         self.inner.clone()
     }
 }
 
-impl<M> SearchIndexTrait<M> for RecyclingSearchIndex<M> where M: entity_trait::Index{
+impl<M> SearchIndexTrait<M> for RecyclingSearchIndex<M>
+where
+    M: entity_trait::Index + Send + Sync + 'static,
+{
     /// Adds the provided models to the search index and then commits the changes.
     async fn add(&self, models: &[M]) -> tantivy::Result<()> {
         let models_len = models.len();

@@ -83,7 +83,7 @@ where
     }
 }
 
-impl<M> SearchIndexTrait<M> for SearchIndex<M> where M: entity_trait::Index{
+impl<M> SearchIndexTrait<M> for SearchIndex<M> where M: entity_trait::Index + Send + Sync + 'static{
         /// Adds the provided models to the search index and then commits the changes.
         async fn add(&self, models: &[M]) -> tantivy::Result<()> {
             let writer = self.writer_recycler.get_writer();
