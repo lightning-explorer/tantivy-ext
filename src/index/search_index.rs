@@ -32,7 +32,7 @@ impl<M> SearchIndex<M>
 where
     M: entity_trait::Index,
 {
-    pub fn new(buffer_size: usize, index_path: PathBuf) -> Self {
+    pub fn new(index_path: PathBuf, buffer_size: usize, entries_before_recycle:usize) -> Self {
         let schema = M::schema();
         // Create the Tantivy index
         let index = if index_path.exists() {
@@ -53,7 +53,6 @@ where
             .try_into()
             .unwrap();
 
-        let entries_before_recycle = buffer_size;
         let writer_recycler =
             IndexWriterRecycler::new(Arc::clone(&index), buffer_size, entries_before_recycle);
 
@@ -166,6 +165,10 @@ where
         self.writer_recycler.get_writer()
     }
 
+    pub async fn recycle_writer(&self)->tantivy::Result<()>{
+        self.writer_recycler.replace_writer().await
+    }
+
     /// Get the schema that this index uses
     pub fn schema() -> &'static Schema {
         M::schema()
@@ -174,6 +177,7 @@ where
     pub fn get_tantivy_backend(&self) -> TantivyBackend {
         TantivyBackend {
             reader: &self.reader,
+            writer: &self.writer_recycler,
             index: &self.index,
             schema: M::schema(),
         }

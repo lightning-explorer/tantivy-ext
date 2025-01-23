@@ -38,6 +38,8 @@ async fn main() {
 
     index.add(&models).await.expect("failed to add item");
 
+    index.recycle_writer().await.expect("Failed to recycle writer");
+
     loop {
         println!("Indexing finished");
         tokio::time::sleep(Duration::from_secs(10)).await;

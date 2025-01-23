@@ -46,7 +46,7 @@ impl IndexWriterRecycler {
         Ok(())
     }
 
-    async fn replace_writer(&self) -> tantivy::Result<()> {
+    pub async fn replace_writer(&self) -> tantivy::Result<()> {
         let mut writer_lock = self.writer.write().await;
 
         if let Some(old_writer) = writer_lock.take() {
