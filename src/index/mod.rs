@@ -11,3 +11,4 @@ mod backend;
 mod writer_recycler;
 pub mod search_index;
 pub mod recycling_index;
+pub mod index_trait;

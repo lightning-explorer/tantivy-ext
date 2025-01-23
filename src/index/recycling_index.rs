@@ -18,7 +18,7 @@ use tokio::sync::RwLock;
 
 use crate::{entity::entity_trait, util::async_retry};
 
-use super::query::builder::QueryBuilder;
+use super::{index_trait::SearchIndexTrait, query::builder::QueryBuilder};
 
 /// A tantivy search index over instances of the provided struct.
 ///
@@ -83,103 +83,6 @@ where
         }
     }
 
-    /// Adds the provided models to the search index and then commits the changes.
-    pub async fn add(&self, models: &[M]) -> tantivy::Result<()> {
-        let models_len = models.len();
-        {
-            let mut inner_lock = self.inner.write().await;
-            let inner = inner_lock.as_mut().unwrap();
-            for model in models {
-                // Delete by the primary key
-                let primary_key_term = model.get_primary_key();
-                inner.writer.delete_term(primary_key_term);
-
-                inner.writer.add_document(model.as_document())?;
-            }
-            self.commit(&mut inner.writer).await?;
-        }
-        // Writer lock must be dropped so this function can use it
-        self.register_entries_processed(models_len).await?;
-        Ok(())
-    }
-
-    /// Removes the provided models from the search index and then commits the changes.
-    pub async fn remove<'a, T>(&self, models: &[M]) -> tantivy::Result<()> {
-        let models_len = models.len();
-        let mut inner_lock = self.inner.write().await;
-        let inner = inner_lock.as_mut().unwrap();
-        {
-            for model in models {
-                let primary_key_term = model.get_primary_key();
-                inner.writer.delete_term(primary_key_term);
-            }
-            self.commit(&mut inner.writer).await?;
-        }
-        // Writer lock must be dropped so this function can use it
-        self.register_entries_processed(models_len).await?;
-        Ok(())
-    }
-
-    /// Removes all models from the search index with the provided term
-    ///
-    /// Example:
-    /// ```rust
-    /// let term = MyModel::name_field().term(String::from("Joe"));
-    /// index.remove_by_terms(vec![term]).await;
-    /// ```
-    pub async fn remove_by_terms(&self, terms: Vec<Term>) -> tantivy::Result<()> {
-        let mut inner_lock = self.inner.write().await;
-        let inner = inner_lock.as_mut().unwrap();
-        let terms_len = terms.len();
-        {
-            for term in terms {
-                inner.writer.delete_term(term);
-            }
-            self.commit(&mut inner.writer).await?;
-        }
-        self.register_entries_processed(terms_len).await?;
-        Ok(())
-    }
-
-    /// Attempt to commit all pending changes.
-    ///
-    /// This function will retry up to 3 times in case of errors.
-    async fn commit(&self, writer: &mut IndexWriter) -> tantivy::Result<()> {
-        async_retry::retry_with_backoff(|_| writer.commit(), 3, Duration::from_millis(100)).await?;
-
-        Ok(())
-    }
-
-    /// Get the query parser for this search index
-    pub async fn query_parser(&self, default_fields: Vec<Field>) -> QueryParser {
-        QueryParser::for_index(
-            &self.inner.read().await.as_ref().unwrap().index,
-            default_fields,
-        )
-    }
-
-    pub async fn query<'a, Q>(&self, query: &'a Q, max_results: usize) -> QueryBuilder<'a, Q, M>
-    where
-        Q: Query + Sized,
-    {
-        let searcher = self.inner.read().await.as_ref().unwrap().reader.searcher();
-        QueryBuilder::new(query, searcher, max_results)
-    }
-
-    pub async fn scored_doc_to_model(&self, doc: (f64, tantivy::DocAddress)) -> tantivy::Result<M> {
-        let searcher = self.inner.read().await.as_ref().unwrap().reader.searcher();
-        let (score, address) = doc;
-
-        let doc = searcher.doc(address)?;
-
-        Ok(M::from_document(doc, score as f32))
-    }
-
-    /// Get the schema that this index uses
-    pub fn schema() -> &'static Schema {
-        M::schema()
-    }
-
     async fn register_entries_processed(&self, entries: usize) -> tantivy::Result<()> {
         self.entries_processed.fetch_add(entries, Ordering::Relaxed);
         if self.entries_processed.load(Ordering::Relaxed) >= self.entries_before_recycle {
@@ -230,5 +133,104 @@ where
     /// Can safely be unwrapped under normal circumstances
     pub async fn get_tantivy_backend(&self) -> Arc<RwLock<Option<TantivyBackend>>> {
         self.inner.clone()
+    }
+}
+
+impl<M> SearchIndexTrait<M> for RecyclingSearchIndex<M> where M: entity_trait::Index{
+    /// Adds the provided models to the search index and then commits the changes.
+    async fn add(&self, models: &[M]) -> tantivy::Result<()> {
+        let models_len = models.len();
+        {
+            let mut inner_lock = self.inner.write().await;
+            let inner = inner_lock.as_mut().unwrap();
+            for model in models {
+                // Delete by the primary key
+                let primary_key_term = model.get_primary_key();
+                inner.writer.delete_term(primary_key_term);
+
+                inner.writer.add_document(model.as_document())?;
+            }
+            self.commit(&mut inner.writer).await?;
+        }
+        // Writer lock must be dropped so this function can use it
+        self.register_entries_processed(models_len).await?;
+        Ok(())
+    }
+
+    /// Removes the provided models from the search index and then commits the changes.
+    async fn remove<'a, T>(&self, models: &[M]) -> tantivy::Result<()> {
+        let models_len = models.len();
+        let mut inner_lock = self.inner.write().await;
+        let inner = inner_lock.as_mut().unwrap();
+        {
+            for model in models {
+                let primary_key_term = model.get_primary_key();
+                inner.writer.delete_term(primary_key_term);
+            }
+            self.commit(&mut inner.writer).await?;
+        }
+        // Writer lock must be dropped so this function can use it
+        self.register_entries_processed(models_len).await?;
+        Ok(())
+    }
+
+    /// Removes all models from the search index with the provided term
+    ///
+    /// Example:
+    /// ```rust
+    /// let term = MyModel::name_field().term(String::from("Joe"));
+    /// index.remove_by_terms(vec![term]).await;
+    /// ```
+    async fn remove_by_terms(&self, terms: Vec<Term>) -> tantivy::Result<()> {
+        let mut inner_lock = self.inner.write().await;
+        let inner = inner_lock.as_mut().unwrap();
+        let terms_len = terms.len();
+        {
+            for term in terms {
+                inner.writer.delete_term(term);
+            }
+            self.commit(&mut inner.writer).await?;
+        }
+        self.register_entries_processed(terms_len).await?;
+        Ok(())
+    }
+
+    /// Attempt to commit all pending changes.
+    ///
+    /// This function will retry up to 3 times in case of errors.
+    async fn commit(&self, writer: &mut IndexWriter) -> tantivy::Result<()> {
+        async_retry::retry_with_backoff(|_| writer.commit(), 3, Duration::from_millis(100)).await?;
+
+        Ok(())
+    }
+
+    /// Get the query parser for this search index
+    async fn query_parser(&self, default_fields: Vec<Field>) -> QueryParser {
+        QueryParser::for_index(
+            &self.inner.read().await.as_ref().unwrap().index,
+            default_fields,
+        )
+    }
+
+    async fn query<'a, Q>(&self, query: &'a Q, max_results: usize) -> QueryBuilder<'a, Q, M>
+    where
+        Q: Query + Sized,
+    {
+        let searcher = self.inner.read().await.as_ref().unwrap().reader.searcher();
+        QueryBuilder::new(query, searcher, max_results)
+    }
+
+    async fn scored_doc_to_model(&self, doc: (f64, tantivy::DocAddress)) -> tantivy::Result<M> {
+        let searcher = self.inner.read().await.as_ref().unwrap().reader.searcher();
+        let (score, address) = doc;
+
+        let doc = searcher.doc(address)?;
+
+        Ok(M::from_document(doc, score as f32))
+    }
+
+    /// Get the schema that this index uses
+    fn schema() -> &'static Schema {
+        M::schema()
     }
 }

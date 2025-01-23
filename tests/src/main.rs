@@ -1,7 +1,7 @@
 use rand::Rng;
 use std::{path::PathBuf, time::Duration};
 use tantivy::time::OffsetDateTime;
-use tantivy_ext::TantivySearchIndex;
+use tantivy_ext::{index::index_trait::SearchIndexTrait, TantivySearchIndex};
 
 #[derive(TantivySearchIndex, Debug)]
 struct MyModel {
