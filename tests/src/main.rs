@@ -21,11 +21,11 @@ async fn main() {
         let save_path = PathBuf::from(r"./TestIndex");
 
         let index = MyModel::index_builder(save_path)
-            .with_memory_budget(50_000_000)
+            .with_memory_budget(15_000_000)
             .with_recycle_after(100_000)
             .build();
 
-        for i in 0..1_000 {
+        for i in 0..100_000 {
             let mut models = Vec::new();
 
             for _ in 0..1_00 {

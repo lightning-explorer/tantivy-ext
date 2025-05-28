@@ -1,6 +1,6 @@
 [package]
 name = "tantivy_ext"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Grayson Rieger graysonr12@icloud.com"]
 edition = "2021"
 license = "MIT"
